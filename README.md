@@ -1,2 +1,2 @@
 # Add Attachments
-Add files directly to a hosted feature layer in AGOL.  Use a specific attribute to match attachments to.
+Add files to a feature layer in AGOL that have been named according to the naming convention in the .py file.  
