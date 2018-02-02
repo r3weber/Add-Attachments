@@ -1,0 +1,61 @@
+"""
+Example: we have a folder of digital photographs of features from the field; the photos
+are named when they are taken in Avenza pdf.  When a SHP is exported, photo names get added to a feature's attribute table in the 'Photos' field. Let's add
+these photos to a feature class as attachments.
+"""
+import re
+import arcpy
+import os
+import sys
+import csv
+
+#set up variables take user inputs
+out_FGDB = arcpy.GetParameterAsText(0)
+in_shapeFile = arcpy.GetParameterAsText(1)
+picFolder = arcpy.GetParameterAsText(2)
+out_Featureclass = re.sub(r'\b[()]|[()]\b', "", (os.path.basename(in_shapeFile[:-4]))).replace(' ', '')
+mainDataset = os.path.join(out_FGDB, out_Featureclass)
+inputField = "Photos"
+objectid = "OBJECTID"
+fc = os.path.join(out_FGDB, out_Featureclass)
+
+#import shapefile and create FC
+arcpy.FeatureClassToFeatureClass_conversion(in_shapeFile, (out_FGDB), (out_Featureclass))
+
+# create a new Match Table csv file
+writer = csv.writer(open(os.path.join(picFolder, "matchtable.csv"), "wb"), delimiter=",")
+# write a header row (the table will have two columns: MATCHID and FILENAME)
+MatchID = "MATCHID"
+pathField = "FILENAME"
+
+writer.writerow([MatchID, pathField])
+
+#List files in folder
+for root, dirs, files in os.walk(picFolder): 
+    for filename in files:
+        cursor = arcpy.SearchCursor(fc)
+        for row in cursor:
+            if filename in row.getValue(inputField):                
+                #if filename is in Photos field of a feature find its objectid and write to csv
+                matchID = row.getValue(objectid)                     
+                writer.writerow([matchID, filename])	
+                continue
+            else:
+                continue
+
+del writer
+
+matchTable = os.path.join(picFolder, "matchtable.csv")
+
+#enable attachements on existing FC
+arcpy.EnableAttachments_management(in_dataset=(mainDataset))
+
+#Add attachements to existing FC using match table
+arcpy.AddAttachments_management(in_dataset=(mainDataset), in_join_field="OBJECTID", in_match_table=(matchTable),
+                                    in_match_join_field=(MatchID), in_match_path_field=(pathField),
+                                    in_working_folder=(picFolder))
+
+print "Features and Attachments added successfully"
+#delete matchtable as it serves no use except to get in the way once the attachments have been added
+arcpy.Delete_management(matchTable)
+print "Removed Match Table"
